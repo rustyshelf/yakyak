@@ -7,7 +7,7 @@ done
 
 ELECTRON_VERSION=$(npm list --depth=0 |grep electron-prebuilt | cut -f2 -d@)
 VERSION=$(node -e "console.log(require('./package').version)")
-PLATFORMS=("darwin-x64" "linux-ia32" "linux-x64" "win32-ia32" "win32-x64")
+PLATFORMS=("darwin-x64") #"linux-ia32" "linux-x64" "win32-ia32" "win32-x64")
 
 mkdir -p dist
 cd dist
