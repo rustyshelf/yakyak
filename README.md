@@ -5,6 +5,10 @@ YakYak
 
 Desktop client for Google Hangouts
 
+![Yak](https://cloud.githubusercontent.com/assets/227204/14331529/03d53a72-fc46-11e5-941a-e4080571a982.png)
+
+Cows are go!
+
 (This app is in no way associated with or endorsed by Google)
 
 ## Install it
