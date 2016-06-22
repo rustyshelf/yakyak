@@ -1,5 +1,5 @@
 autosize = require 'autosize'
-clipboard = require 'clipboard'
+clipboard = require('electron').clipboard
 {scrollToBottom, messages} = require './messages'
 {later, toggleVisibility} = require '../util'
 
@@ -105,15 +105,15 @@ module.exports = view (models) ->
 
             span class:'button-container', ->
                 button title:'Show emoticons', onclick: (ef) ->
-                    toggleVisibility document.querySelector '#emoji-container'
+                    document.querySelector('#emoji-container').classList.toggle('open');
                     scrollToBottom()
                 , ->
-                    span class:'icon-emoji'
+                    span class:'material-icons', "mood"
             , ->
                 button title:'Attach image', onclick: (ev) ->
                     document.getElementById('attachFile').click()
                 , ->
-                    span class:'icon-attach'
+                    span class:'material-icons', 'photo'
                 input type:'file', id:'attachFile', accept:'.jpg,.jpeg,.png,.gif', onchange: (ev) ->
                     action 'uploadimage', ev.target.files
 

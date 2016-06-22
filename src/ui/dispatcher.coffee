@@ -1,6 +1,6 @@
 Client = require 'hangupsjs'
-remote = require 'remote'
-ipc    = require 'ipc'
+remote = require('electron').remote
+ipc    = require('electron').ipcRenderer
 
 {entity, conv, viewstate, userinput, connection, convsettings, notify} = require './models'
 {throttle, later, isImg} = require './util'
@@ -23,6 +23,7 @@ handle 'init', (init) ->
     # set the initial view state
     viewstate.setLoggedin true
     viewstate.setState viewstate.STATE_NORMAL
+    viewstate.setColorScheme viewstate.colorScheme
 
     # update model from init object
     entity._initFromSelfEntity init.self_entity
@@ -31,7 +32,9 @@ handle 'init', (init) ->
     # ensure there's a selected conv
     unless conv[viewstate.selectedConv]
         viewstate.setSelectedConv conv.list()?[0]?.conversation_id
-    
+
+    ipc.send 'initpresence', entity.list()
+
     require('./version').check()
 
 handle 'chat_message', (ev) ->
@@ -41,6 +44,18 @@ handle 'chat_message', (ev) ->
 
 handle 'watermark', (ev) ->
     conv.addWatermark ev
+
+handle 'presence', (ev) ->
+    entity.setPresence ev[0][0][0][0], if ev[0][0][1][1] == 1 then true else false
+
+# handle 'self_presence', (ev) ->
+#     console.log 'self_presence', ev
+
+handle 'querypresence', (id) ->
+    ipc.send 'querypresence', id
+
+handle 'setpresence', (r) ->
+    entity.setPresence r.user_id.chat_id, r.presence.available
 
 handle 'update:unreadcount', ->
     console.log 'update'
@@ -91,6 +106,10 @@ handle 'sendmessage', (txt) ->
 handle 'toggleshowtray', ->
     viewstate.setShowTray(not viewstate.showtray)
 
+handle 'togglemenu', ->
+    mainWindow = remote.getCurrentWindow()
+    if mainWindow.isMenuBarVisible() then mainWindow.setMenuBarVisibility(false) else mainWindow.setMenuBarVisibility(true)
+
 handle 'togglehidedockicon', ->
     viewstate.setHideDockIcon(not viewstate.hidedockicon)
 
@@ -101,10 +120,13 @@ handle 'togglewindow', ->
 handle 'togglestartminimizedtotray', ->
     viewstate.setStartMinimizedToTray(not viewstate.startminimizedtotray)
 
+handle 'toggleclosetotray', ->
+    viewstate.setCloseToTray(not viewstate.closetotray)
+
 handle 'showwindow', ->
     mainWindow = remote.getCurrentWindow() # And we hope we don't get another ;)
     mainWindow.show()
-  
+
 sendsetpresence = throttle 10000, ->
     ipc.send 'setpresence'
     ipc.send 'setactiveclient', true, 15
@@ -304,7 +326,7 @@ handle 'hangout_event', (e) ->
     # trigger notifications for this
     notify.addToNotify e
 
-'presence reply_to_invite settings conversation_notification invitation_watermark'.split(' ').forEach (n) ->
+'reply_to_invite settings conversation_notification invitation_watermark'.split(' ').forEach (n) ->
     handle n, (as...) -> console.log n, as...
 
 handle 'unreadtotal', (total, orMore) ->
@@ -314,6 +336,15 @@ handle 'unreadtotal', (total, orMore) ->
 
 handle 'showconvthumbs', (doshow) ->
     viewstate.setShowConvThumbs doshow
+
+handle 'showconvtime', (doshow) ->
+    viewstate.setShowConvTime doshow
+
+handle 'showconvlast', (doshow) ->
+    viewstate.setShowConvLast doshow
+
+handle 'changetheme', (colorscheme) ->
+    viewstate.setColorScheme colorscheme
 
 handle 'devtools', ->
     remote.getCurrentWindow().openDevTools detach:true
@@ -326,7 +357,7 @@ handle 'togglefullscreen', ->
 
 handle 'zoom', (step) ->
     if step?
-        return viewstate.setZoom (parseFloat(document.body.style.zoom) or 1.0) + step
+        return viewstate.setZoom (parseFloat(document.body.style.zoom.replace(',', '.')) or 1.0) + step
     viewstate.setZoom 1
 
 handle 'logout', ->

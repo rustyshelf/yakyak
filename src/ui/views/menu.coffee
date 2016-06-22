@@ -1,5 +1,5 @@
-remote = require 'remote'
-Menu = remote.require 'menu'
+remote = require('electron').remote
+Menu = remote.Menu
 
 templateOsx = (viewstate) -> [{
     label: 'YakYak'
@@ -39,6 +39,43 @@ templateOsx = (viewstate) -> [{
             checked:viewstate.showConvThumbs
             enabled: viewstate.loggedin
             click: (it) -> action 'showconvthumbs', it.checked
+        }, {
+            type: 'checkbox'
+            label: 'Show Conversation Timestamp'
+            checked:viewstate.showConvTime
+            enabled: viewstate.loggedin
+            click: (it) -> action 'showconvtime', it.checked
+        }, {
+            type: 'checkbox'
+            label: 'Show Conversation Last Message'
+            checked:viewstate.showConvLast
+            enabled: viewstate.loggedin
+            click: (it) -> action 'showconvlast', it.checked
+        }, {
+            label: 'Color Scheme'
+            submenu: [
+                {
+                    label: 'Default'
+                    type: 'radio'
+                    checked: viewstate.colorScheme == 'default'
+                    click: -> action 'changetheme', 'default'
+                }, {
+                    label: 'Blue'
+                    type: 'radio'
+                    checked: viewstate.colorScheme == 'blue'
+                    click: -> action 'changetheme', 'blue'
+                }, {
+                    label: 'Dark'
+                    type: 'radio'
+                    checked: viewstate.colorScheme == 'dark'
+                    click: -> action 'changetheme', 'dark'
+                }, {
+                    label: 'Material'
+                    type: 'radio'
+                    checked: viewstate.colorScheme == 'material'
+                    click: -> action 'changetheme', 'material'
+                }
+            ]
         }, {
             label: 'Toggle Full Screen',
             accelerator: 'Command+Control+F',
@@ -81,7 +118,7 @@ templateOsx = (viewstate) -> [{
             checked:  viewstate.hidedockicon
             click: -> action 'togglehidedockicon'
         }
-    ]},{
+    ]}, {
     label: 'Window',
     submenu: [
         {
@@ -109,6 +146,8 @@ templateOsx = (viewstate) -> [{
 templateOthers = (viewstate) -> [{
     label: 'YakYak'
     submenu: [
+        { label: 'Hide YakYak', accelerator: 'Control+H', role: 'minimize' }
+        { type: 'separator' }
         { label: 'Open Inspector', accelerator: 'Control+Alt+I', click: -> action 'devtools' }
         { type: 'separator' }
         { type: 'separator' }
@@ -119,6 +158,16 @@ templateOthers = (viewstate) -> [{
         }
         { label: 'Quit', accelerator: 'Control+Q', click: -> action 'quit' }
     ]}, {
+    label: 'Edit'
+    submenu: [
+        { label: 'Undo', accelerator: 'Control+Z', role: 'undo' }
+        { label: 'Redo', accelerator: 'Control+Shift+Z', role: 'redo' }
+        { type: 'separator' }
+        { label: 'Cut', accelerator: 'Control+X', role: 'cut' }
+        { label: 'Copy', accelerator: 'Control+C', role: 'copy' }
+        { label: 'Paste', accelerator: 'Control+V', role: 'paste' }
+        { label: 'Select All', accelerator: 'Control+A', role: 'selectall' }
+    ]}, {
     label: 'View'
     submenu: [
         {
@@ -127,6 +176,18 @@ templateOthers = (viewstate) -> [{
             checked:viewstate.showConvThumbs
             enabled: viewstate.loggedin
             click: (it) -> action 'showconvthumbs', it.checked
+        }, {
+            type: 'checkbox'
+            label: 'Show Conversation Timestamp'
+            checked:viewstate.showConvTime
+            enabled: viewstate.loggedin
+            click: (it) -> action 'showconvtime', it.checked
+        }, {
+            type: 'checkbox'
+            label: 'Show Conversation Last Message'
+            checked:viewstate.showConvLast
+            enabled: viewstate.loggedin
+            click: (it) -> action 'showconvlast', it.checked
         }, {
             label: 'Toggle Full Screen',
             accelerator: 'Control+Alt+F',
@@ -165,7 +226,33 @@ templateOthers = (viewstate) -> [{
             checked:  viewstate.showtray
             click: -> action 'toggleshowtray'
         }
-    ]}
+    ]},
+    {
+            label: 'Color Scheme'
+            submenu: [
+                {
+                    label: 'Default'
+                    type: 'radio'
+                    checked: viewstate.colorScheme == 'default'
+                    click: -> action 'changetheme', 'default'
+                }, {
+                    label: 'Blue'
+                    type: 'radio'
+                    checked: viewstate.colorScheme == 'blue'
+                    click: -> action 'changetheme', 'blue'
+                }, {
+                    label: 'Dark'
+                    type: 'radio'
+                    checked: viewstate.colorScheme == 'dark'
+                    click: -> action 'changetheme', 'dark'
+                }, {
+                    label: 'Material'
+                    type: 'radio'
+                    checked: viewstate.colorScheme == 'material'
+                    click: -> action 'changetheme', 'material'
+                }
+            ]
+        }
 ]
 
 module.exports = (viewstate) ->

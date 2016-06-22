@@ -1,7 +1,7 @@
 moment = require 'moment'
-shell = require 'shell'
+shell = require('electron').shell
 
-{nameof, linkto, later, forceredraw, throttle,
+{nameof, nameofconv, linkto, later, forceredraw, throttle,
 getProxiedName, fixlink, isImg, getImageUrl}  = require '../util'
 
 CUTOFF = 5 * 60 * 1000 * 1000 # 5 mins
@@ -84,7 +84,7 @@ module.exports = view (models) ->
         grouped = groupEvents c.event, entity
         div class:'historyinfo', ->
             if c.requestinghistory
-                pass 'Requesting history…', -> span class:'icon-spin1 animate-spin'
+                pass 'Requesting history…', -> span class:'material-icons spin', 'donut_large'
         for g in grouped
             div class:'tgroup', ->
                 span class:'timestamp', moment(g.start / 1000).calendar()
@@ -93,13 +93,12 @@ module.exports = view (models) ->
                     clz = ['ugroup']
                     clz.push 'self' if entity.isSelf(u.cid)
                     div class:clz.join(' '), ->
-                        a href:linkto(u.cid), {onclick}, class:'sender', ->
+                        a href:linkto(u.cid), title:sender, {onclick}, class:'sender', ->
                             purl = entity[u.cid]?.photo_url
                             unless purl
                                 purl = "images/photo.jpg"
                                 entity.needEntity u.cid
                             img src:fixlink(purl)
-                            span sender
                         div class:'umessages', ->
                             drawMessage(e, entity) for e in u.event
 
@@ -118,7 +117,7 @@ drawMessage = (e, entity) ->
             format content
             # loadInlineImages content
             if e.placeholder and e.uploadimage
-                span class:'icon-spin1 animate-spin'
+                span class:'material-icons spin', 'donut_large'
         else if e.conversation_rename
             pass "renamed conversation to #{e.conversation_rename.new_name}"
             # {new_name: "labbot" old_name: ""}
@@ -130,6 +129,17 @@ drawMessage = (e, entity) ->
                 pass "invited #{names}"
             else if t == 'LEAVE'
                 pass "#{names} left the conversation"
+        else if e.hangout_event
+          hangout_event = e.hangout_event
+          style = 'vertical-align': 'middle'
+          if hangout_event.event_type is 'START_HANGOUT'
+              span { class: 'material-icons', style }, 'call_made_small'
+              pass ' Call started'
+          else if hangout_event.event_type is 'END_HANGOUT'
+              span { class:'material-icons small', style }, 'call_end'
+              pass ' Call ended'
+        else
+          console.log 'unhandled event type', e, entity
 
 
 atTopIfSmall = ->
@@ -210,6 +220,7 @@ preload = (href) ->
 
 
 formatAttachment = (att) ->
+    console.log 'attachment', att if att.length > 0
     if att?[0]?.embed_item?.type_
         {href, thumb} = extractProtobufStyle(att)
     else if att?[0]?.embed_item?.type
@@ -243,6 +254,10 @@ extractProtobufStyle = (att) ->
     return unless k
     href = data?[k]?[5]
     thumb = data?[k]?[9]
+    if not thumb
+      href = data?[k]?[4]
+      thumb = data?[k]?[5]
+
     {href, thumb}
 
 extractObjectStyle = (att) ->

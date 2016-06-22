@@ -11,19 +11,24 @@ STATES =
 
 module.exports = exp = {
     state: null
-    attop: false   # tells whether message list is scrolle to top
+    attop: false   # tells whether message list is scrolled to top
     atbottom: true # tells whether message list is scrolled to bottom
     selectedConv: localStorage.selectedConv
     lastActivity: null
-    leftSize: tryparse(localStorage.leftSize) ? 200
+    leftSize: tryparse(localStorage.leftSize) ? 240
     size: tryparse(localStorage.size ? "[940, 600]")
     pos: tryparse(localStorage.pos ? "[100, 100]")
-    showConvThumbs: tryparse(localStorage.showConvThumbs)
+    showConvThumbs: tryparse(localStorage.showConvThumbs) ? true
+    showConvTime: tryparse(localStorage.showConvTime) ? true
+    showConvLast: tryparse(localStorage.showConvLast) ? true
+    colorScheme: localStorage.colorScheme or 'default'
     zoom: tryparse(localStorage.zoom ? "1.0")
     loggedin: false
     showtray: tryparse(localStorage.showtray) or false
     hidedockicon: tryparse(localStorage.hidedockicon) or false
     startminimizedtotray: tryparse(localStorage.startminimizedtotray) or false
+    closetotray: tryparse(localStorage.closetotray) or false
+    showDockOnce: true
 
     setState: (state) ->
         return if @state == state
@@ -79,20 +84,21 @@ module.exports = exp = {
     setSize: (size) ->
         localStorage.size = JSON.stringify(size)
         @size = size
-        updated 'viewstate'
+        # updated 'viewstate'
 
     setPosition: (pos) ->
         localStorage.pos = JSON.stringify(pos)
         @pos = pos
-        updated 'viewstate'
+        # updated 'viewstate'
 
     setLeftSize: (size) ->
-        return if @leftSize == size
+        return if @leftSize == size or size < 180
         @leftSize = localStorage.leftSize = size
         updated 'viewstate'
 
     setZoom: (zoom) ->
         @zoom = localStorage.zoom = document.body.style.zoom = zoom
+        document.body.style.setProperty('--zoom', zoom)
 
     setLoggedin: (val) ->
         @loggedin = val
@@ -128,9 +134,30 @@ module.exports = exp = {
         @showConvThumbs = localStorage.showConvThumbs = doshow
         updated 'viewstate'
 
+    setShowConvTime: (doshow) ->
+        return if @showConvTime == doshow
+        @showConvTime = localStorage.showConvTime = doshow
+        updated 'viewstate'
+
+    setShowConvLast: (doshow) ->
+        return if @showConvLast == doshow
+        @showConvLast = localStorage.showConvLast = doshow
+        updated 'viewstate'
+
+    setColorScheme: (colorscheme) ->
+        @colorScheme = localStorage.colorScheme = colorscheme
+        while document.querySelector('html').classList.length > 0
+            document.querySelector('html').classList.remove document.querySelector('html').classList.item(0)
+        document.querySelector('html').classList.add(colorscheme)
+
     setShowTray: (value) ->
         @showtray = localStorage.showtray = value
-        if not value then @setStartMinimizedToTray(false) else updated 'viewstate'
+
+        if not @showtray
+            @setCloseToTray(false)
+            @setStartMinimizedToTray(false)
+        else
+            updated 'viewstate'
 
     setHideDockIcon: (value) ->
         @hidedockicon = localStorage.hidedockicon = value
@@ -140,7 +167,13 @@ module.exports = exp = {
         @startminimizedtotray = localStorage.startminimizedtotray = value
         updated 'viewstate'
 
+    setShowDockIconOnce: (value) ->
+        @showDockIconOnce = value
 
+
+    setCloseToTray: (value) ->
+        @closetotray = localStorage.closetotray = !!value
+        updated 'viewstate'
 }
 
 merge exp, STATES

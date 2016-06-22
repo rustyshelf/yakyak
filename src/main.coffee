@@ -1,28 +1,33 @@
 Client    = require 'hangupsjs'
 Q         = require 'q'
 login     = require './login'
-ipc       = require 'ipc'
+ipc       = require('electron').ipcMain
 fs        = require 'fs'
 path      = require 'path'
 tmp       = require 'tmp'
-clipboard = require 'clipboard'
-Menu      = require 'menu'
+clipboard = require('electron').clipboard
+Menu      = require('electron').menu
+session = require('electron').session
 
 tmp.setGracefulCleanup()
 
-app = require 'app'
+app = require('electron').app
 
-BrowserWindow = require 'browser-window'
+BrowserWindow = require('electron').BrowserWindow
+
+userData = path.normalize(app.getPath('userData'))
+fs.mkdirSync(userData) if not fs.existsSync userData
 
 paths =
-    rtokenpath:  path.normalize path.join app.getPath('userData'), 'refreshtoken.txt'
-    cookiespath: path.normalize path.join app.getPath('userData'), 'cookies.json'
-    chromecookie: path.normalize path.join app.getPath('userData'), 'Cookies'
-    configpath: path.normalize path.join app.getPath('userData'), 'config.json'
+    rtokenpath: path.join(userData, 'refreshtoken.txt')
+    cookiespath: path.join(userData, 'cookies.json')
+    chromecookie: path.join(userData, 'Cookies')
+    configpath: path.join(userData, 'config.json')
 
-client = new Client
-    rtokenpath:  paths.rtokenpath
+client = new Client(
+    rtokenpath: paths.rtokenpath
     cookiespath: paths.cookiespath
+)
 
 if fs.existsSync paths.chromecookie
     fs.unlinkSync paths.chromecookie
@@ -55,25 +60,23 @@ if shouldQuit
     return;
 
 # No more minimizing to tray, just close it
-readyToClose = false
+global.forceClose = false;
 quit = ->
-    readyToClose = true
+    global.forceClose = true;
     app.quit()
+    return
 
-# Quit when all windows are closed.
-app.on 'window-all-closed', ->
-    app.quit() if (process.platform != 'darwin')
+app.on 'before-quit', ->
+    global.forceClose = true;
+    return
 
 # For OSX show window main window if we've hidden it.
-app.on 'activate-with-no-open-windows', ->
-    mainWindow.show() if (process.platform == 'darwin')
-
-# If we're actually trying to close the app set it to force close
-app.on 'before-quit', ->
-    mainWindow?.forceClose = true
+# https://github.com/electron/electron/blob/master/docs/api/app.md#event-activate-os-x
+app.on 'activate', ->
+    mainWindow.show()
 
 loadAppWindow = ->
-    mainWindow.loadUrl 'file://' + __dirname + '/ui/index.html'
+    mainWindow.loadURL 'file://' + __dirname + '/ui/index.html'
 
 toggleWindowVisible = ->
     if mainWindow.isVisible() then mainWindow.hide() else mainWindow.show()
@@ -88,11 +91,14 @@ app.on 'ready', ->
            {url:'http://plus.google.com',  env:'HTTP_PROXY'}
            {url:'https://plus.google.com', env:'HTTPS_PROXY'}
         ]
-        Q.all todo.map (t) -> Q.Promise (rs) -> app.resolveProxy t.url, (proxyURL) ->
-            # Format of proxyURL is either "DIRECT" or "PROXY 127.0.0.1:8888"
-            [_, purl] = proxyURL.split ' '
-            process.env[t.env] ?= if purl then "http://#{purl}" else ""
-            rs()
+        Q.all todo.map (t) -> Q.Promise (rs) ->
+            console.log "resolving proxy #{t.url}"
+            session.defaultSession.resolveProxy t.url, (proxyURL) ->
+                console.log "resolved proxy #{proxyURL}"
+                # Format of proxyURL is either "DIRECT" or "PROXY 127.0.0.1:8888"
+                [_, purl] = proxyURL.split ' '
+                process.env[t.env] ?= if purl then "http://#{purl}" else ""
+                rs()
 
     # Create the browser window.
     mainWindow = new BrowserWindow {
@@ -102,6 +108,8 @@ app.on 'ready', ->
         "min-height": 420
         icon: path.join __dirname, 'icons', 'icon.png'
         show: true
+        titleBarStyle: 'hidden-inset' if process.platform is 'darwin'
+        autoHideMenuBar : true unless process.platform is 'darwin'
     }
 
 
@@ -122,13 +130,20 @@ app.on 'ready', ->
             "min-height": 420
             icon: path.join __dirname, 'icons', 'icon.png'
             show: true
+            webPreferences: {
+                nodeIntegration: false
+            }
         }
+
+        loginWindow.on 'closed', quit
+
         mainWindow.hide()
         loginWindow.focus()
         # reinstate app window when login finishes
         prom = login(loginWindow)
         .then (rs) ->
-          loginWindow.forceClose = true
+          global.forceClose = true
+          loginWindow.removeAllListeners 'closed'
           loginWindow.close()
           mainWindow.show()
           rs
@@ -144,7 +159,19 @@ app.on 'ready', ->
 
     # keeps trying to connec the hangupsjs and communicates those
     # attempts to the client.
-    reconnect = -> proxycheck().then -> client.connect(creds)
+    reconnect = ->
+      console.log 'reconnecting', reconnectCount
+      proxycheck().then ->
+          client.connect(creds)
+          .then ->
+              console.log 'connected', reconnectCount
+              # on first connect, send init, after that only resync
+              if reconnectCount == 0
+                  sendInit()
+              else
+                  syncrecent()
+              reconnectCount++
+          .catch (e) -> console.log 'error connecting', e
 
     # counter for reconnects
     reconnectCount = 0
@@ -152,16 +179,7 @@ app.on 'ready', ->
     # whether to connect is dictated by the client.
     ipc.on 'hangupsConnect', ->
         console.log 'hconnect'
-        # first connect
         reconnect()
-        .then ->
-            console.log 'connected', reconnectCount
-            # on first connect, send init, after that only resync
-            if reconnectCount == 0
-                sendInit()
-            else
-                syncrecent()
-            reconnectCount++
 
     ipc.on 'hangupsDisconnect', ->
         console.log 'hdisconnect'
@@ -173,8 +191,8 @@ app.on 'ready', ->
     mainWindow.on 'move',  (ev) -> ipcsend 'move', mainWindow.getPosition()
 
     # whenever it fails, we try again
-    client.on 'connect_failed', ->
-        console.log 'connect_failed'
+    client.on 'connect_failed', (e) ->
+        console.log 'connect_failed', e
         wait(3000).then -> reconnect()
 
     # when client requests (re-)init since the first init
@@ -188,6 +206,19 @@ app.on 'ready', ->
         client.sendchatmessage(conv_id, segs, image_id, otr, client_generated_id).then (r) ->
             ipcsend 'sendchatmessage:result', r
         , true # do retry
+
+    # sendchatmessage, executed sequentially and
+    # retried if not sent successfully
+    ipc.on 'querypresence', seqreq (ev, id) ->
+        client.querypresence(id).then (r) ->
+            ipcsend 'querypresence:result', r.presence_result[0]
+        , false, -> 1
+
+    ipc.on 'initpresence', (ev, l) ->
+        for p, i in l when p != null
+            client.querypresence(p.id).then (r) ->
+                ipcsend 'querypresence:result', r.presence_result[0]
+            , false, -> 1
 
     # no retry, only one outstanding call
     ipc.on 'setpresence', seqreq ->
@@ -327,15 +358,15 @@ app.on 'ready', ->
         client.on n, (e) ->
             ipcsend n, e
 
-    # Emitted when the window is actually closed.
-    mainWindow.on 'closed', ->
-        mainWindow = null
-
     # Emitted when the window is about to close.
     # For OSX only hides the window if we're not force closing.
     mainWindow.on 'close', (ev) ->
-        darwinHideOnly = process.platform == 'darwin' and not mainWindow?.forceClose
+        darwinHideOnly = process.platform == 'darwin' and not global.forceClose
 
         if darwinHideOnly
             ev.preventDefault()
             mainWindow.hide()
+            return
+
+        mainWindow = null
+        quit()

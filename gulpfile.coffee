@@ -23,7 +23,8 @@ paths =
     html:    './src/**/*.html'
     images:  './src/**/images/*.*'
     icons:   './src/icons'
-    less:    './src/**/*.less'
+    less:    './src/ui/css/manifest.less'
+    lessd:   './src/ui/css/**/*.less'
     css:     './src/**/*.css'
     fonts:   ['./src/**/*.eot', './src/**/*.svg',
               './src/**/*.ttf', './src/**/*.woff']
@@ -73,6 +74,7 @@ gulp.task 'icons', ->
     nameMap =
         'icon_016.png': 'icon.png'
         'icon-unread.png': 'icon-unread.png'
+        'icon-read.png': 'icon-read.png'
         'icon_032.png': 'icon@2.png'
         'icon_048.png': 'icon@3.png'
         'icon_128.png': 'icon@8.png'
